@@ -26,21 +26,22 @@ Relay frezzer_motor(RELAY_FREZZER_PIN, true);  // constructor receives (pin, isN
 //Relay humy_circulation(RELAY_CIRCULATION_PIN, true);  // constructor receives (pin, isNormallyOpen) true = Normally Open, false = Normally Closed
 
 // >>> ### --- PWM CASE FAN 25 kHz --- ### >>>
-constexpr int PWM_FAN_TOP = 3;
-constexpr int PWM_FAN_BOTTOM = 5;
+struct Pin{
+  uint8_t pwmPin;
+};
+constexpr Pin PWM_FAN_TOP {3};
+constexpr Pin PWM_FAN_BOTTOM  {11};
 //constexpr int fan = 5;
 constexpr int speed = 5;
 constexpr int MAX_TEMPERATURE = 18;
 constexpr int MAX_HUMIDITY = 58;
 constexpr int MED_HUMIDITY = 55;
 
-struct Pin {
 
-};
 
 // overwrite default analogWrite function for pwm fan pins
-void analogWrite(const Pin &nPin, uint8_t percent) {
-  if (nPin == PWM_FAN_TOP || nPin == PWM_FAN_BOTTOM) OCR1A = map(percent, 0, 100, 0, ICR1);
+void analogWrite(const Pin &pin, const uint8_t percent) {
+  if (pin.pwmPin == PWM_FAN_TOP || pin.pwmPin == PWM_FAN_BOTTOM) OCR1A = map(percent, 0, 100, 0, ICR1);
 }
 
 byte textLen;
