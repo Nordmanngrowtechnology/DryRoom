@@ -1,7 +1,7 @@
 // arduino lib
 #include <Arduino.h>
 
-// for SHT45 PIN on Arduino Nano
+// >>> ### --- SHT45 TEMP & HUMIDY --- ### >>>
 // Cable black = SHIELD on Case
 // Cable red = VDD 5V PIN_5V
 // Cable green = SCL PIN_19  **A5
@@ -13,38 +13,40 @@ ArtronShop_SHT45 sht45(&Wire, 0x44);  // SHT45-AD1B => I2C adress 0x44
 float temp;
 float humidity;
 
-// for display
+// >>> ### --- DISPLAY --- ### >>>
 #include <LiquidCrystal_I2C.h>       //Include lib
 LiquidCrystal_I2C lcd(0x27, 16, 2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 
 
-// for relay 1,2..
-constexpr int RELAY_FREZZER_PIN = 14;
+// >>> ### --- REALY --- ### >>>
+constexpr int RELAY_FREZZER_PIN = 9; // Signal to SPDT, 30 A
 //constexpr int RELAY_CIRCULATION_PIN = 15;
 #include "Relay.h"
-Relay frezzer_motor(RELAY_FREZZER_PIN, false);  // constructor receives (pin, isNormallyOpen) true = Normally Open, false = Normally Closed
+Relay frezzer_motor(RELAY_FREZZER_PIN, true);  // constructor receives (pin, isNormallyOpen) true = Normally Open, false = Normally Closed
 //Relay humy_circulation(RELAY_CIRCULATION_PIN, true);  // constructor receives (pin, isNormallyOpen) true = Normally Open, false = Normally Closed
 
-// PWM Fan controll pins
+// >>> ### --- PWM CASE FAN 25 kHz --- ### >>>
 constexpr int PWM_FAN_TOP = 3;
 constexpr int PWM_FAN_BOTTOM = 5;
-
 constexpr int fan;
 constexpr int speed;
 
-// Fan speed function over analogwirte pwm signal max. 255
-void fanSpeed(int fan, int speed) {
-  // if %
-  if (!speed >= 0 or !speed <= 100) {
-    Serial.println("The fan speed must be set to a value between 0 and 100 !");
-  }
-  // calculate % from 255
-  speed = round(255 / 100 * speed);
-  analogWrite(fan, speed);  // > set speed pwm
+// overwrite default analogWrite function for pwm fan pins
+void analogWrite(const Pin &nPin, uint8_t percent) {
+  if (nPin == PWM_FAN_TOP || nPin == PWM_FAN_BOTTOM) OCR1A = map(percent, 0, 100, 0, ICR1);
 }
 
 byte textLen;
 void setup() {
+
+  // reset the atmega timer on nano
+  TCNT1 = 0;                                        // Count Increment or decrement TCNT1 by 1. set to 0
+  TCCR1A = 0; TCCR1B = 0;                           // TCCR1 register to 0
+  ICR1  = 320;                                      // counter limiter
+  TCCR1B |= (1 << WGM13); TCCR1A |= (1 << WGM11);   // 16.4 Timer/Counter Clock Sources Register B (TCCR1B)
+  TCCR1A |= (1 << COM1A1);                          // 16.2.1 Registers
+  TCCR1B |= (1 << CS10);
+
   // inti serial
   Serial.begin(9600);
 

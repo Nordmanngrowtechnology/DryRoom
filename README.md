@@ -22,6 +22,14 @@ TCCR1B |= (1 << CS10);
 
 # Test as dry room controller
 
-- 1x Relay SPDT, 30 A, SLA-05VDC-SL-C
-- 1x LCD I2C 2*16
-- 1x SHT45 Sensor
+| Pin | Method         | Hard.                             | More.    |
+|-----|----------------|-----------------------------------|----------|
+| 3   | analogWrite()  | Top FAN                           |          |
+| 5   | analogWrite()  | Bottom FAN                        |          |
+| 18  | readBytes()    | SHT 45                            | SDA 0x44 |
+| 19  | readBytes()    | SHT 45                            | SCL 0x44 |
+| 18  | readBytes()    | Display 16*2                      | SDA 0x27 |
+| 19  | readBytes()    | Display 16*2                      | SCL 0x27 |
+| 14  | readBytes()    | FAN-Tacho Top                     |          |
+| 15  | readBytes()    | FAN-Tacho Bottom                  |          |
+| 9   | digitalWrite() | Relay SPDT, 30 A, SLA-05VDC-SL-C  |          |
