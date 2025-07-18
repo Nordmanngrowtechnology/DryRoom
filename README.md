@@ -1,12 +1,19 @@
-# Test Arduino Nano (Old Bootloader)
+# DryRoom Controller with Arduino Nano (Old Bootloader) 
+- Arduino Nano
+- Atmega328P 16Mhz
+- USB-C
 
+## Forum Post
+[https://forum.arduino.cc/t/kleine-klimasteuerung-fragen-bevor-es-durchbrennt/1393747](https://forum.arduino.cc/t/kleine-klimasteuerung-fragen-bevor-es-durchbrennt/1393747)
 
 ![Trocknung_ArduinoNano_Steckplatine.png](fritzing/Trocknung_ArduinoNano_Steckplatine.png)
 
-# PWM Signal specification 25 kHz best patrice case fan
+# Specification PWM Case Fan
+### PWM Signal specification 25 kHz best patrice case fan
 
 How to page 134 16.9.4, 135 Phase Correct PWM
 https://ww1.microchip.com/downloads/aemDocuments/documents/MCU08/ProductDocuments/DataSheets/ATmega48A-PA-88A-PA-168A-PA-328-P-DS-DS40002061B.pdf
+
 
 
 ```
@@ -20,16 +27,20 @@ TCCR1A |= (1 << COM1A1);                          // 16.2.1 Registers
 TCCR1B |= (1 << CS10);
 ```
 
-# Test as dry room controller
+## Attention
+Minimum fan PWM signal in my case 5% duty cycle. Use Paired Timer TC1 on pin 3 & 11
+
+
+## Hardware to test the dry room controller
 
 | Pin | Method         | Hard.                             | More.    |
 |-----|----------------|-----------------------------------|----------|
-| 3   | analogWrite()  | Top FAN                           |          |
-| 5   | analogWrite()  | Bottom FAN                        |          |
+| 3   | analogWrite()  | Top FAN                           | PWM      |
+| 11  | analogWrite()  | Bottom FAN                        | PWM      |
 | 18  | readBytes()    | SHT 45                            | SDA 0x44 |
 | 19  | readBytes()    | SHT 45                            | SCL 0x44 |
 | 18  | readBytes()    | Display 16*2                      | SDA 0x27 |
 | 19  | readBytes()    | Display 16*2                      | SCL 0x27 |
-| 14  | readBytes()    | FAN-Tacho Top                     |          |
-| 15  | readBytes()    | FAN-Tacho Bottom                  |          |
+| 14  | readAnalog()   | FAN-Tacho Top                     |          |
+| 15  | readAnalog()   | FAN-Tacho Bottom                  |          |
 | 9   | digitalWrite() | Relay SPDT, 30 A, SLA-05VDC-SL-C  |          |

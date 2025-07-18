@@ -28,11 +28,15 @@ Relay frezzer_motor(RELAY_FREZZER_PIN, true);  // constructor receives (pin, isN
 // >>> ### --- PWM CASE FAN 25 kHz --- ### >>>
 constexpr int PWM_FAN_TOP = 3;
 constexpr int PWM_FAN_BOTTOM = 5;
-constexpr int fan;
-constexpr int speed;
+//constexpr int fan = 5;
+constexpr int speed = 5;
 constexpr int MAX_TEMPERATURE = 18;
 constexpr int MAX_HUMIDITY = 58;
 constexpr int MED_HUMIDITY = 55;
+
+struct Pin {
+
+};
 
 // overwrite default analogWrite function for pwm fan pins
 void analogWrite(const Pin &nPin, uint8_t percent) {
