@@ -12,9 +12,9 @@
 ArtronShop_SHT45 sensor(&Wire, 0x44); // default is right (&Wire, 0x44) SHT45-AD1B => I2C address 0x44
 float temperature;
 float humidity;
-constexpr int MAX_TEMPERATURE = 18;
-constexpr int MAX_HUMIDITY = 58;
-constexpr int MED_HUMIDITY = 55;
+constexpr float MAX_TEMPERATURE = 18.0;
+constexpr float MAX_HUMIDITY = 58.0;
+constexpr float MED_HUMIDITY = 55.0;
 
 // >>> ### --- DISPLAY --- ### >>>
 // Cable green = SCL PIN_19  **A5
@@ -24,9 +24,6 @@ LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for 16 chars 
 
 // >>> ### --- COOLING_COMPRESSOR RELAY --- ### >>>
 constexpr int COOLING_COMPRESSOR_PIN = 9; // Signal to SPDT, 30 A
-#include "Relay.h"
-Relay cooling_compressor(COOLING_COMPRESSOR_PIN, true);
-
 
 // >>> ### --- PWM CASE FAN 25 kHz --- ### >>>
 struct Pin {
@@ -45,6 +42,29 @@ void analogWrite(const Pin &pin, const uint8_t percent) {
 }
 
 byte textLen;
+unsigned long previousMillis = 0;
+unsigned long interval = 10000; // 10 second
+bool checkup = false;
+
+bool startUpCheck() {
+    // display message
+    lcd.setCursor(0, 0);
+    lcd.print("Startup Check");
+    analogWrite(FAN_PWM_PIN_A, 100);
+    analogWrite(FAN_PWM_PIN_B, 100);
+    delay(1500);
+    analogWrite(FAN_PWM_PIN_A, 50);
+    analogWrite(FAN_PWM_PIN_B, 50);
+    delay(1500);
+    analogWrite(FAN_PWM_PIN_A, 25);
+    analogWrite(FAN_PWM_PIN_B, 25);
+    delay(1500);
+    analogWrite(FAN_PWM_PIN_A, 0);
+    analogWrite(FAN_PWM_PIN_B, 0);
+    delay(1500);
+    lcd.clear();
+    return true;
+}
 
 void setup() {
     // reset the atmega timer on nano
@@ -64,25 +84,34 @@ void setup() {
     lcd.init();
     lcd.backlight();
 
-    // init wire chanel check SHT45 connectet
-    Wire.begin();
-    textLen = sizeof("SHT45 not found !") - 1;
-    while (!sensor.begin()) {
-        Serial.println("SHT45 not found !");
-        // add error to display
-        lcd.print("SHT45 not found !");
-        // Scroll hidden text through entire row to the right outside the screen
-        for (byte positionCounter = 0; positionCounter < textLen + 16; positionCounter++) {
-            lcd.scrollDisplayRight();
-            delay(500);
-        }
-    }
-
     // Relay init the pin set it to "OUTPUT"
-    cooling_compressor.begin();
+    pinMode(COOLING_COMPRESSOR_PIN, OUTPUT);
+    digitalWrite(COOLING_COMPRESSOR_PIN, LOW);
+    delay(15);
+
+    // pwm
+    pinMode(FAN_PWM_PIN_A.pwmPin, OUTPUT);
+    delay(15);
+    pinMode(FAN_PWM_PIN_B.pwmPin, OUTPUT);
+    delay(15);
+
+    // init wire chanel check SHT45 connected
+    Wire.begin();
+    while (!sensor.begin()) {
+        Serial.println("SHT45 notfound!");
+        // add error to display
+        lcd.print("SHT45 notfound!");
+        delay(2000);
+    }
 }
 
 void loop() {
+    // Boot up fan check
+    if (checkup == false) {
+        checkup = startUpCheck();
+    }
+
+
     // if the sensor connected
     if (sensor.measure()) {
         // serial debug message
@@ -93,71 +122,75 @@ void loop() {
         Serial.print(" %RH");
         Serial.println();
 
-        // get sensor values
-        temperature = sensor.temperature();
-        humidity = sensor.humidity();
+        // time marker
+        const unsigned long currentMillis = millis();
 
         // HANDLE TEMPERATURE
         //  is HIGH
-        if (temperature > MAX_TEMPERATURE) {
-            // start compressor
-            cooling_compressor.turnOn();
-            // display message
-            lcd.setCursor(0, 0);
-            lcd.print("Die Kuehlung ist eingeschaltet");
-            lcd.setCursor(0, 1);
-            lcd.print(String("Temperatur: ") + String(temperature));
-            // Fan circulation on
-            analogWrite(FAN_PWM_PIN_A, 40);
-            analogWrite(FAN_PWM_PIN_B, 50);
-        } else {
-            // stop compressor
-            cooling_compressor.turnOff();
-            // display message
-            lcd.setCursor(0, 0);
-            lcd.print("Kuehlung aus");
-            lcd.setCursor(0, 1);
-            lcd.print(String("Temperatur: ") + String(temperature));
+        if (temperature >= MAX_TEMPERATURE) { digitalWrite(COOLING_COMPRESSOR_PIN, HIGH); }
+
+        if (currentMillis - previousMillis >= interval) {
+            lcd.clear();
+            temperature = sensor.temperature();
+            if (temperature >= MAX_TEMPERATURE) {
+                // start compressor
+                digitalWrite(COOLING_COMPRESSOR_PIN, HIGH);
+                // display message
+                lcd.setCursor(0, 0);
+                lcd.print("Kuehlung ON");
+                lcd.setCursor(0, 1);
+                lcd.print(String("Temperatur: ") + String(temperature));
+                // Fan circulation on
+                analogWrite(FAN_PWM_PIN_A, 30);
+                analogWrite(FAN_PWM_PIN_B, 40);
+            } else {
+                // stop compressor
+                digitalWrite(COOLING_COMPRESSOR_PIN, LOW);
+                // display message
+                lcd.setCursor(0, 0);
+                lcd.print("Kuehlung OFF");
+                lcd.setCursor(0, 1);
+                lcd.print(String("Temperatur: ") + String(temperature));
+            }
         }
 
-        delay(10000); // 10 second to next
-
+        // set new time
+        previousMillis = currentMillis;
 
         // HANDLE HUMIDITY
+        humidity = sensor.humidity();
         if (humidity >= MAX_HUMIDITY) {
             // MAX_HUMIDITY: Fast fan circulation it is real wet
-            analogWrite(FAN_PWM_PIN_A, 70);
-            analogWrite(FAN_PWM_PIN_B, 80);
+            analogWrite(FAN_PWM_PIN_A, 30);
+            analogWrite(FAN_PWM_PIN_B, 40);
             // display message
             lcd.setCursor(0, 0);
-            lcd.print(String("Sehr feuchte Luft: ") + String(humidity));
+            lcd.print(String("Humidity: ") + String(humidity));
             lcd.setCursor(0, 1);
-            lcd.print("Luefter Cyrculation sehr schnell!");
+            lcd.print("Fast Fan!");
         } else if (humidity > MED_HUMIDITY) {
             // MED_HUMIDITY: Moderate fan circulation
-            analogWrite(FAN_PWM_PIN_A, 40);
-            analogWrite(FAN_PWM_PIN_B, 50);
+            analogWrite(FAN_PWM_PIN_A, 30);
+            analogWrite(FAN_PWM_PIN_B, 40);
             // display message
             lcd.setCursor(0, 0);
-            lcd.print(String("Die Luftfeuchtigkeit ist: ") + String(humidity));
+            lcd.print(String("Humidity: ") + String(humidity));
             lcd.setCursor(0, 1);
-            lcd.print("Lüfter laufen langsam.");
+            lcd.print("Lower Fan!.");
         } else {
-            // DEFAULT: Slow fan cyrculation
-            analogWrite(FAN_PWM_PIN_A, 5);
-            analogWrite(FAN_PWM_PIN_B, 8);
+            // DEFAULT: Slow fan circulation
+            analogWrite(FAN_PWM_PIN_A, 15);
+            analogWrite(FAN_PWM_PIN_B, 13);
             // display message
             lcd.setCursor(0, 0);
-            lcd.print(String("Die Luftfeuchtigkeit ist: ") + String(humidity));
+            lcd.print(String("Humidity: ") + String(humidity));
             lcd.setCursor(0, 1);
-            lcd.print("Luefter laufen langsam.");
+            lcd.print("Slow Fan!.");
         }
-
-        delay(10000); // 10 second to next
     } else {
         // sensor connection error run fan by default low
-        analogWrite(FAN_PWM_PIN_A, 10);
-        analogWrite(FAN_PWM_PIN_B, 13);
+        analogWrite(FAN_PWM_PIN_A, 5);
+        analogWrite(FAN_PWM_PIN_B, 8);
         // print out error message
         Serial.println("SHT45 read error");
         lcd.setCursor(0, 0);
