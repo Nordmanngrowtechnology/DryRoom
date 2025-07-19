@@ -9,34 +9,37 @@
 // Cable black = GND PIN_GND
 #include <Wire.h>
 #include <ArtronShop_SHT45.h>
-ArtronShop_SHT45 sht45(&Wire, 0x44);  // SHT45-AD1B => I2C adress 0x44
-float temp;
+ArtronShop_SHT45 sensor(&Wire, 0x44);  // default is right (&Wire, 0x44) SHT45-AD1B => I2C address 0x44
+float temperature;
 float humidity;
 
 // >>> ### --- DISPLAY --- ### >>>
 #include <LiquidCrystal_I2C.h>       //Include lib
-LiquidCrystal_I2C lcd(0x27, 16, 2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // set the LCD address to 0x27 for 16 chars and 2 line display
 
 
-// >>> ### --- REALY --- ### >>>
-constexpr int RELAY_FREZZER_PIN = 9; // Signal to SPDT, 30 A
-//constexpr int RELAY_CIRCULATION_PIN = 15;
+// >>> ### --- COOLING_COMPRESSOR RELAY --- ### >>>
+constexpr int COOLING_COMPRESSOR_PIN = 9; // Signal to SPDT, 30 A
 #include "Relay.h"
-Relay frezzer_motor(RELAY_FREZZER_PIN, true);  // constructor receives (pin, isNormallyOpen) true = Normally Open, false = Normally Closed
-//Relay humy_circulation(RELAY_CIRCULATION_PIN, true);  // constructor receives (pin, isNormallyOpen) true = Normally Open, false = Normally Closed
+Relay cooling_compressor(COOLING_COMPRESSOR_PIN, true);  // constructor receives (pin, isNormallyOpen) true = Normally Open, false = Normally Closed
+
 
 // >>> ### --- PWM CASE FAN 25 kHz --- ### >>>
-constexpr int PWM_FAN_TOP = 3;
-constexpr int PWM_FAN_BOTTOM = 5;
-constexpr int fan;
-constexpr int speed;
+ struct Pin{
+  uint8_t pwmPin;
+};
+constexpr Pin FAN_PWM_PIN_A {3};
+constexpr Pin FAN_PWM_PIN_B  {11};
+constexpr int DEFAULT_SPEED = 5;
 constexpr int MAX_TEMPERATURE = 18;
 constexpr int MAX_HUMIDITY = 58;
 constexpr int MED_HUMIDITY = 55;
 
+
+
 // overwrite default analogWrite function for pwm fan pins
-void analogWrite(const Pin &nPin, uint8_t percent) {
-  if (nPin == PWM_FAN_TOP || nPin == PWM_FAN_BOTTOM) OCR1A = map(percent, 0, 100, 0, ICR1);
+void analogWrite(const Pin &pin, const uint8_t percent) {
+  if (pin.pwmPin == FAN_PWM_PIN_A.pwmPin || pin.pwmPin == FAN_PWM_PIN_B.pwmPin) OCR1A = map(percent, 0, 100, 0, ICR1);
 }
 
 byte textLen;
@@ -60,7 +63,7 @@ void setup() {
   // init wire chanel check SHT45 connectet
   Wire.begin();
   textLen = sizeof("SHT45 not found !") - 1;
-  while (!sht45.begin()) {
+  while (!sensor.begin()) {
     Serial.println("SHT45 not found !");
     // add error to display
     lcd.print("SHT45 not found !");
@@ -72,57 +75,57 @@ void setup() {
   }
 
   // Relays intit the pins
-  frezzer_motor.begin();
+  cooling_compressor.begin();
   //humy_circulation.begin();
 }
 void loop() {
 
   // Fan circulation low on
-  analogWrite(PWM_FAN_TOP, 10);
-  analogWrite(PWM_FAN_BOTTOM, 13);
+  analogWrite(FAN_PWM_PIN_A, 10);
+  analogWrite(FAN_PWM_PIN_B, 13);
 
   // test SHT45
-  if (sht45.measure()) {
+  if (sensor.measure()) {
     Serial.print("Temperature: ");
-    Serial.print(sht45.temperature(), 1);
+    Serial.print(sensor.temperature(), 1);
     Serial.print(" *C\tHumidity: ");
-    Serial.print(sht45.humidity(), 1);
+    Serial.print(sensor.humidity(), 1);
     Serial.print(" %RH");
     Serial.println();
 
-    // HANDLE TEMPARATUR
-    temp = sht45.temperature();
+    // HANDLE TEMPERATURE
+    temperature = sensor.temperature();
 
-    // temparature to hige
-    if (temp > MAX_TEMPERATURE) {
-      // run kompressor
-      frezzer_motor.turnOn();
+    // temperature is HIGH
+    if (temperature > MAX_TEMPERATURE) {
+      // start compressor
+      cooling_compressor.turnOn();
       lcd.setCursor(0, 0);
       lcd.print("Die Kuehlung ist eingeschaltet");
       lcd.setCursor(0, 1);
-      lcd.print(String("Temparatur: ") + String(temp));
+      lcd.print(String("Temparatur: ") + String(temperature));
 
       // Fan circulation on
-      analogWrite(PWM_FAN_TOP, 50);
-      analogWrite(PWM_FAN_BOTTOM, 40);
+      analogWrite(FAN_PWM_PIN_A, 50);
+      analogWrite(FAN_PWM_PIN_B, 40);
     } else {
-      // frezzer relay off
-      frezzer_motor.turnOff();
+      // stop compressor
+      cooling_compressor.turnOff();
       // show temp on display
     lcd.setCursor(0, 1);
-    lcd.print(String("Temparatur: ") + String(temp));
+    lcd.print(String("Temparatur: ") + String(temperature));
     }
 
     delay(10000); // 10 second to next
 
 
     // HANDLE HUMIDITY
-    humidity = sht45.humidity();
+    humidity = sensor.humidity();
 
     if (humidity >= MAX_HUMIDITY) {
-      // MAX_HUMIDITY: Fast fan circulation it is rely wet
-      analogWrite(PWM_FAN_TOP, 80);
-      analogWrite(PWM_FAN_BOTTOM, 70);
+      // MAX_HUMIDITY: Fast fan circulation it is real wet
+      analogWrite(FAN_PWM_PIN_A, 80);
+      analogWrite(FAN_PWM_PIN_B, 70);
       // massage output
       lcd.setCursor(0, 0);
       lcd.print(String("Sehr feuchte Luft: ") + String(humidity));
@@ -130,9 +133,9 @@ void loop() {
       lcd.print("Luefter Cyrculation sehr schnell!");
     }
     else if (humidity > MED_HUMIDITY) {
-      // MED_HUMIDITY: Modarate fan circulation
-      analogWrite(PWM_FAN_TOP, 50);
-      analogWrite(PWM_FAN_BOTTOM, 40);
+      // MED_HUMIDITY: Moderate fan circulation
+      analogWrite(FAN_PWM_PIN_A, 50);
+      analogWrite(FAN_PWM_PIN_B, 40);
       // massage output
       lcd.setCursor(0, 0);
       lcd.print(String("Die Luftfeuchtigkeit ist: ") + String(humidity));
@@ -140,8 +143,8 @@ void loop() {
       lcd.print("Lüfter laufen langsam.");
     }else{
     // DEFAULT: Slow fan cyrculation
-    analogWrite(PWM_FAN_TOP, 10);
-    analogWrite(PWM_FAN_BOTTOM, 13);
+    analogWrite(FAN_PWM_PIN_A, 10);
+    analogWrite(FAN_PWM_PIN_B, 13);
     // massage output
       lcd.setCursor(0, 0);
       lcd.print(String("Die Luftfeuchtigkeit ist: ") + String(humidity));

@@ -1,4 +1,5 @@
-# DryRoom Controller with Arduino Nano (Old Bootloader) 
+# DryRoom Controller with Arduino Nano ATmega328 (New Bootloader)
+https://docs.platformio.org/en/latest/boards/atmelavr/nanoatmega328new.html
 - Arduino Nano
 - Atmega328P 16Mhz
 - USB-C
