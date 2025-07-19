@@ -38,10 +38,9 @@ constexpr int DEFAULT_SPEED = 5;
 // overwrite default analogWrite function for pwm fan pins
 void analogWrite(const Pin &pin, const uint8_t percent) {
     if (pin.pwmPin == FAN_PWM_PIN_A.pwmPin || pin.pwmPin == FAN_PWM_PIN_B.pwmPin)
-        OCR1A = map(percent, 0, 100, 0, ICR1);
+        OCR1A = map(percent, 0, 100, 0, ICR1);// ICR1 320
 }
 
-byte textLen;
 unsigned long previousMillis = 0;
 unsigned long interval = 10000; // 10 second
 bool checkup = false;
@@ -56,26 +55,28 @@ bool startUpCheck() {
     analogWrite(FAN_PWM_PIN_A, 50);
     analogWrite(FAN_PWM_PIN_B, 50);
     delay(1500);
-    analogWrite(FAN_PWM_PIN_A, 25);
-    analogWrite(FAN_PWM_PIN_B, 25);
+    analogWrite(FAN_PWM_PIN_A, 30);
+    analogWrite(FAN_PWM_PIN_B, 30);
     delay(1500);
-    analogWrite(FAN_PWM_PIN_A, 0);
-    analogWrite(FAN_PWM_PIN_B, 0);
-    delay(1500);
+    analogWrite(FAN_PWM_PIN_A, 15);
+    analogWrite(FAN_PWM_PIN_B, 15);
+    delay(3000);
     lcd.clear();
     return true;
 }
 
 void setup() {
+    noInterrupts();
     // reset the atmega timer on nano
     TCNT1 = 0; // Count Increment or decrement TCNT1 by 1. set to 0
-    TCCR1A = 0;
-    TCCR1B = 0; // TCCR1 register to 0
+    TCCR1A = 0; // TCCR1A register to 0
+    TCCR1B = 0; // TCCR1B register to 0
     ICR1 = 320; // counter limiter
-    TCCR1B |= (1 << WGM13);
-    TCCR1A |= (1 << WGM11); // 16.4 Timer/Counter Clock Sources Register B (TCCR1B)
-    TCCR1A |= (1 << COM1A1); // 16.2.1 Registers
-    TCCR1B |= (1 << CS10);
+    TCCR1B |= (1 << WGM13); // The phase correct Pulse Width Modulation or phase correct PWM mode (WGM13:0 = 1
+    TCCR1A |= (1 << WGM11); // WGM11:0 = 1 Waveform Generation Mode 16.4 PWM, Phase Correct, 9-bit
+    TCCR1A |= (1 << COM1A1); // Set OC1A/OC1B on Compare Match when upcounting. Clear OC1A/OC1B on Compare Match when down counting
+    TCCR1B |= (1 << CS10); // clkI/O/1 (No prescaling)
+    interrupts();
 
     // inti serial
     Serial.begin(9600);
@@ -124,6 +125,8 @@ void loop() {
 
         // time marker
         const unsigned long currentMillis = millis();
+        const float temperature = sensor.temperature();
+        const float humidity = sensor.humidity();
 
         // HANDLE TEMPERATURE
         //  is HIGH
@@ -131,7 +134,7 @@ void loop() {
 
         if (currentMillis - previousMillis >= interval) {
             lcd.clear();
-            temperature = sensor.temperature();
+
             if (temperature >= MAX_TEMPERATURE) {
                 // start compressor
                 digitalWrite(COOLING_COMPRESSOR_PIN, HIGH);
@@ -158,7 +161,6 @@ void loop() {
         previousMillis = currentMillis;
 
         // HANDLE HUMIDITY
-        humidity = sensor.humidity();
         if (humidity >= MAX_HUMIDITY) {
             // MAX_HUMIDITY: Fast fan circulation it is real wet
             analogWrite(FAN_PWM_PIN_A, 30);
@@ -195,5 +197,6 @@ void loop() {
         Serial.println("SHT45 read error");
         lcd.setCursor(0, 0);
         lcd.print("SHT45 sensor read error");
+        delay(5000);
     }
 }
