@@ -30,50 +30,64 @@ struct Pin {
     uint8_t pwmPin;
 };
 
-constexpr Pin FAN_PWM_PIN_A{10};
-constexpr Pin FAN_PWM_PIN_B{9};
+constexpr Pin FAN_PWM_PIN_A{9};// 10
+constexpr Pin FAN_PWM_PIN_B{10}; //9
 constexpr int DEFAULT_SPEED = 32;
 bool fanOn = false;
 
-
-// overwrite default analogWrite function for pwm fan pins
-void analogWrite(const Pin &pin, const uint8_t percent) {
-    if (pin.pwmPin == FAN_PWM_PIN_A.pwmPin || pin.pwmPin == FAN_PWM_PIN_B.pwmPin)
-        OCR1A = map(percent, 0, 100, 0, ICR1); // ICR1 320
-}
 
 unsigned long previousMillis = 0;
 unsigned long interval = 10000; // 10 second
 bool checkup = false;
 
 // debug function uncomment for debug
-//#define DEBUG_PWM true
+#define DEBUG_PWM true
+#ifdef DEBUG_PWM
 long i = 0;
+long timer_cycles = 0;
+long Frequency = 0;
+#endif
 
 bool pwmSignalDebug(const long i) {
-    Serial.println("PWM Signal Debug");
-    Serial.println(i);
-    return true;
-}
+    // arduino nano 16MHz
+    Serial.println("PWM Signal Debug Output Nr: " + String(i));
+    Serial.println("#############################");
 
-// system boot test
-bool startUpCheck() {
-    // display message
-    lcd.setCursor(0, 0);
-    lcd.print("Startup Check");
-    analogWrite(FAN_PWM_PIN_A, 100);
-    analogWrite(FAN_PWM_PIN_B, 100);
-    delay(1500);
-    analogWrite(FAN_PWM_PIN_A, 50);
-    analogWrite(FAN_PWM_PIN_B, 50);
-    delay(1500);
-    analogWrite(FAN_PWM_PIN_A, 30);
-    analogWrite(FAN_PWM_PIN_B, 30);
-    delay(1500);
-    analogWrite(FAN_PWM_PIN_A, 5);
-    analogWrite(FAN_PWM_PIN_B, 5);
-    delay(3000);
-    lcd.clear();
+    // test calculation of duty cycle
+    OCR1A = map(100, 0, 100, 0, ICR1);
+
+    // top
+    Serial.print("ICR1: ");
+    Serial.println(ICR1);
+    Serial.println("----------------------");
+    // duty cycle
+    Serial.print("OCR1A: ");
+    Serial.println(OCR1A);
+    Serial.println("----------------------");
+
+    // register timer1
+    Serial.print("Timer1 TCNT1: ");
+    Serial.print(TCNT1);
+    Serial.println(" Count before overflow");
+    Serial.println("----------------------");
+    // register
+    Serial.print("TCCR1A: ");
+    Serial.println(TCCR1A);
+    Serial.println("----------------------");
+    // register
+    Serial.print("TCCR1B: ");
+    Serial.println(TCCR1B);
+    Serial.println("----------------------");
+
+    // show frequency
+    Serial.print("PWM Signal Frequency: ");
+    timer_cycles = ICR1 + 1;
+    Frequency = 16000000 / (1 * timer_cycles) / 2;
+    Serial.print(Frequency);
+    Serial.println(" Hz");
+    Serial.println("----------------------");
+
+    delay(5000);
     return true;
 }
 
@@ -130,6 +144,33 @@ void setup() {
         delay(2000);
     }
 #endif
+}
+
+// overwrite default analogWrite function for pwm fan pins
+void analogWrite(const Pin &pin, const uint8_t percent) {
+    if (pin.pwmPin == FAN_PWM_PIN_A.pwmPin) { OCR1A = map(percent, 0, 100, 0, ICR1); } // ICR1 320
+    if (pin.pwmPin == FAN_PWM_PIN_B.pwmPin) { OCR1B = map(percent, 0, 100, 0, ICR1); } // ICR1 320
+}
+
+// system boot test
+bool startUpCheck() {
+    // display message
+    lcd.setCursor(0, 0);
+    lcd.print("Startup Check");
+    analogWrite(FAN_PWM_PIN_A, 100);
+    analogWrite(FAN_PWM_PIN_B, 100);
+    delay(1500);
+    analogWrite(FAN_PWM_PIN_A, 50);
+    analogWrite(FAN_PWM_PIN_B, 50);
+    delay(1500);
+    analogWrite(FAN_PWM_PIN_A, 30);
+    analogWrite(FAN_PWM_PIN_B, 30);
+    delay(1500);
+    analogWrite(FAN_PWM_PIN_A, 5);
+    analogWrite(FAN_PWM_PIN_B, 5);
+    delay(3000);
+    lcd.clear();
+    return true;
 }
 
 void loop() {
@@ -199,12 +240,12 @@ void loop() {
             // MAX_HUMIDITY: Fast fan circulation it is real wet
             fanOn = true;
             analogWrite(FAN_PWM_PIN_A, 50);
-            analogWrite(FAN_PWM_PIN_B, 60);
+            analogWrite(FAN_PWM_PIN_B, 50);
             // display message
             lcd.setCursor(0, 0);
             lcd.print(String("Humidity: ") + String(humidity));
             lcd.setCursor(0, 1);
-            lcd.print("Fast Fan!");
+            lcd.print("Fast Fan! 50%");
         } else if (humidity > MED_HUMIDITY) {
             // MED_HUMIDITY: Moderate fan circulation
             fanOn = true;
@@ -238,5 +279,4 @@ void loop() {
         delay(5000);
     }
 #endif
-
 }
