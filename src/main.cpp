@@ -30,8 +30,8 @@ struct Pin {
     uint8_t pwmPin;
 };
 
-constexpr Pin FAN_PWM_PIN_A{9};// 10
-constexpr Pin FAN_PWM_PIN_B{10}; //9
+constexpr Pin FAN_PWM_PIN_A{10};// 10
+constexpr Pin FAN_PWM_PIN_B{9}; //9
 constexpr int DEFAULT_SPEED = 32;
 bool fanOn = false;
 
@@ -41,17 +41,24 @@ unsigned long interval = 10000; // 10 second
 bool checkup = false;
 
 // debug function uncomment for debug
-#define DEBUG_PWM true
+//#define DEBUG_PWM true
 #ifdef DEBUG_PWM
 long i = 0;
 long timer_cycles = 0;
 long Frequency = 0;
-#endif
+
 
 bool pwmSignalDebug(const long i) {
     // arduino nano 16MHz
     Serial.println("PWM Signal Debug Output Nr: " + String(i));
     Serial.println("#############################");
+
+    // show pin
+    Serial.print("PWM Connected to pin: ");
+    Serial.print(FAN_PWM_PIN_A.pwmPin);
+    Serial.print(" and ");
+    Serial.println(FAN_PWM_PIN_B.pwmPin);
+    Serial.println("----------------------");
 
     // test calculation of duty cycle
     OCR1A = map(100, 0, 100, 0, ICR1);
@@ -90,7 +97,7 @@ bool pwmSignalDebug(const long i) {
     delay(5000);
     return true;
 }
-
+#endif
 
 void setup() {
     cli(); // disable interrupts
@@ -98,7 +105,8 @@ void setup() {
     /*
      *  DEFINITION TIMER1 FOR ATMEL ATmega328P
      *  https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf
-     */
+     *  https://www.mikrocontroller.net/articles/AVR-Tutorial:_Timer
+    */
 
     // RESET
     TCNT1 = 0;
@@ -148,8 +156,8 @@ void setup() {
 
 // overwrite default analogWrite function for pwm fan pins
 void analogWrite(const Pin &pin, const uint8_t percent) {
-    if (pin.pwmPin == FAN_PWM_PIN_A.pwmPin) { OCR1A = map(percent, 0, 100, 0, ICR1); } // ICR1 320
-    if (pin.pwmPin == FAN_PWM_PIN_B.pwmPin) { OCR1B = map(percent, 0, 100, 0, ICR1); } // ICR1 320
+    if (pin.pwmPin == FAN_PWM_PIN_A.pwmPin) { OCR1A = map(percent, 0, 100, 0, ICR1); Serial.println("Halo Pins A"); } // ICR1 320
+    if (pin.pwmPin == FAN_PWM_PIN_B.pwmPin) { OCR1B = map(percent, 0, 100, 0, ICR1); Serial.println("Halo Pins B");} // ICR1 320
 }
 
 // system boot test
@@ -159,18 +167,44 @@ bool startUpCheck() {
     lcd.print("Startup Check");
     analogWrite(FAN_PWM_PIN_A, 100);
     analogWrite(FAN_PWM_PIN_B, 100);
-    delay(1500);
+    Serial.println("Fan run 100%");
+    delay(20000);
     analogWrite(FAN_PWM_PIN_A, 50);
     analogWrite(FAN_PWM_PIN_B, 50);
-    delay(1500);
+    Serial.println("Fan run 50%");
+    delay(10000);
     analogWrite(FAN_PWM_PIN_A, 30);
     analogWrite(FAN_PWM_PIN_B, 30);
-    delay(1500);
+    Serial.println("Fan run 30%");
+    delay(10000);
     analogWrite(FAN_PWM_PIN_A, 5);
     analogWrite(FAN_PWM_PIN_B, 5);
-    delay(3000);
+    Serial.println("Fan run 5%");
+    delay(10000);
+    analogWrite(FAN_PWM_PIN_A, 100);
+    analogWrite(FAN_PWM_PIN_B, 100);
+    Serial.println("Last run 100%");
+    delay(10000);
     lcd.clear();
     return true;
+
+    // display message
+    /*lcd.setCursor(0, 0);
+    lcd.print("Startup Check analogWrite");
+    analogWrite(FAN_PWM_PIN_A.pwmPin, 255);
+    analogWrite(FAN_PWM_PIN_B.pwmPin, 255);
+    delay(5000);
+    analogWrite(FAN_PWM_PIN_A.pwmPin, 120);
+    analogWrite(FAN_PWM_PIN_B.pwmPin, 120);
+    delay(5000);
+    analogWrite(FAN_PWM_PIN_A.pwmPin, 30);
+    analogWrite(FAN_PWM_PIN_B.pwmPin, 30);
+    delay(1500);
+    analogWrite(FAN_PWM_PIN_A.pwmPin, 5);
+    analogWrite(FAN_PWM_PIN_B.pwmPin, 5);
+    delay(5000);
+    lcd.clear();
+    return true;*/
 }
 
 void loop() {
