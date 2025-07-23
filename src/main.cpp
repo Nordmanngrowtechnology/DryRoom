@@ -32,7 +32,7 @@ struct Pin {
 
 constexpr Pin FAN_PWM_PIN_A{10};// 10
 constexpr Pin FAN_PWM_PIN_B{9}; //9
-constexpr int DEFAULT_SPEED = 32;
+constexpr int DEFAULT_SPEED = 5; // The lowest PWM Duty Cycle the fank can look in datasheet for your fan
 bool fanOn = false;
 
 
@@ -85,6 +85,10 @@ bool pwmSignalDebug(const long i) {
     Serial.print("TCCR1B: ");
     Serial.println(TCCR1B);
     Serial.println("----------------------");
+    // register
+    Serial.print("Register Setting COM1A0: ");
+    Serial.println(COM1A0);
+    Serial.println("----------------------");
 
     // show frequency
     Serial.print("PWM Signal Frequency: ");
@@ -108,19 +112,22 @@ void setup() {
      *  https://www.mikrocontroller.net/articles/AVR-Tutorial:_Timer
     */
 
-    // RESET
+    // RESET  Clear Timer/Counter control registers
     TCNT1 = 0;
     TCCR1A = 0;
-    TCCR1B = 0; // defined timer & register to 0
+    TCCR1B = 0;
 
-    // TOP
+    // Set TOP value for 25kHz frequency (ICR1)
     ICR1 = 320; // Set TOP limiter to 320 >>> update OCR1A at TOP
 
     // REGISTER DEFINITION
-    TCCR1B |= (1 << WGM13); // The phase correct Pulse Width Modulation or phase correct PWM mode (WGM13:0 = 1
     TCCR1A |= (1 << WGM11); // PWM, Phase Correct
-    TCCR1A |= (1 << COM1A1); // Clear OC1A/OC1B on Compare match when down counting set output to low level
+    TCCR1B |= (1 << WGM13); // The phase correct Pulse Width Modulation or phase correct PWM mode (WGM13:0 = 1
     TCCR1B |= (1 << CS10); // clkI/O/1 (No prescaling)
+
+    // Need COM1A1 and COM1B1 for tow pin output
+    TCCR1A |= (1 << COM1A1) | (1 << COM1B1); // Clear OC1A/OC1B on Compare match when down counting set output to low level
+
 
     sei(); // allow interrupts
 
@@ -156,8 +163,8 @@ void setup() {
 
 // overwrite default analogWrite function for pwm fan pins
 void analogWrite(const Pin &pin, const uint8_t percent) {
-    if (pin.pwmPin == FAN_PWM_PIN_A.pwmPin) { OCR1A = map(percent, 0, 100, 0, ICR1); Serial.println("Halo Pins A"); } // ICR1 320
-    if (pin.pwmPin == FAN_PWM_PIN_B.pwmPin) { OCR1B = map(percent, 0, 100, 0, ICR1); Serial.println("Halo Pins B");} // ICR1 320
+    if (pin.pwmPin == FAN_PWM_PIN_A.pwmPin) { OCR1A = map(percent, 0, 100, 0, ICR1);} // ICR1 320
+    if (pin.pwmPin == FAN_PWM_PIN_B.pwmPin) { OCR1B = map(percent, 0, 100, 0, ICR1);} // ICR1 320
 }
 
 // system boot test
@@ -188,23 +195,6 @@ bool startUpCheck() {
     lcd.clear();
     return true;
 
-    // display message
-    /*lcd.setCursor(0, 0);
-    lcd.print("Startup Check analogWrite");
-    analogWrite(FAN_PWM_PIN_A.pwmPin, 255);
-    analogWrite(FAN_PWM_PIN_B.pwmPin, 255);
-    delay(5000);
-    analogWrite(FAN_PWM_PIN_A.pwmPin, 120);
-    analogWrite(FAN_PWM_PIN_B.pwmPin, 120);
-    delay(5000);
-    analogWrite(FAN_PWM_PIN_A.pwmPin, 30);
-    analogWrite(FAN_PWM_PIN_B.pwmPin, 30);
-    delay(1500);
-    analogWrite(FAN_PWM_PIN_A.pwmPin, 5);
-    analogWrite(FAN_PWM_PIN_B.pwmPin, 5);
-    delay(5000);
-    lcd.clear();
-    return true;*/
 }
 
 void loop() {
@@ -273,8 +263,8 @@ void loop() {
         if (humidity >= MAX_HUMIDITY) {
             // MAX_HUMIDITY: Fast fan circulation it is real wet
             fanOn = true;
-            analogWrite(FAN_PWM_PIN_A, 50);
-            analogWrite(FAN_PWM_PIN_B, 50);
+            analogWrite(FAN_PWM_PIN_A, 10);
+            analogWrite(FAN_PWM_PIN_B, 10);
             // display message
             lcd.setCursor(0, 0);
             lcd.print(String("Humidity: ") + String(humidity));
