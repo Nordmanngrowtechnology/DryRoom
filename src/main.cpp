@@ -42,7 +42,7 @@ constexpr Pin FAN_PWM_PIN_BOTTOM_FAN{9};       // 9
 constexpr uint8_t FAN_MINIMUM_DUTY_CYCLE = 6;  // The lowest PWM Duty Cycle the fank can look
                                                // in datasheet for your fan
 constexpr uint8_t FAN_MAXIMAL_DUTY_CYCLE = 50; // Maximal Fan Speed
-constexpr uint8_t CIRCULATION_SPREAD = 10;     // Circulation spread between pwm groups top fan bottom fan
+constexpr uint8_t CIRCULATION_SPREAD = 5;     // Circulation spread between pwm groups top fan bottom fan
 bool fanOn = false;
 
 // INT CONF
@@ -228,21 +228,19 @@ void circulation(const uint8_t percent)
 // calculate the percent speed for todo validate types and resolution
 uint8_t mySpeed(const float humi)
 {
-    if (humi >= MAX_HUMIDITY)
-    {
-        return FAN_MAXIMAL_DUTY_CYCLE;
-    }
+
     if (humi <= MIN_HUMIDITY)
     {
         return FAN_MINIMUM_DUTY_CYCLE;
     }
 
-    constexpr float h_range = MAX_HUMIDITY - MIN_HUMIDITY;                   // 4
-    constexpr int s_range = FAN_MAXIMAL_DUTY_CYCLE - FAN_MINIMUM_DUTY_CYCLE; // 45
+    constexpr float h_range = 100 - MIN_HUMIDITY;                   // 46
+    constexpr int s_range = FAN_MAXIMAL_DUTY_CYCLE - FAN_MINIMUM_DUTY_CYCLE; // 44
 
-    constexpr float step = s_range / h_range;
+    constexpr float part = s_range / h_range;
 
-    const auto speed = static_cast<uint8_t>(humi - MIN_HUMIDITY * step);
+    const auto speed = static_cast<uint8_t>(humi - MIN_HUMIDITY * part + FAN_MINIMUM_DUTY_CYCLE);
+    // 61 - 54 * 0.95 + 6;
 
     return speed; // 12
 }
