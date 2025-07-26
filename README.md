@@ -88,3 +88,6 @@ Important is we use Timer1 >> and the located output to OC1A, OC1B by Arduino Na
 | 5   | digitalWrite() | Relay SPDT, **30 A**, SLA-05VDC-SL-C  | attention* |
 
 *Standard relays aren't sufficient. To switch high power, proper relays are needed.
+
+# TODO
+Add the real cooling sw profil non-public
