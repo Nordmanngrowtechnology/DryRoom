@@ -39,80 +39,16 @@ struct Pin
 
 constexpr Pin FAN_PWM_PIN_TOP_FAN{10};         // 10
 constexpr Pin FAN_PWM_PIN_BOTTOM_FAN{9};       // 9
-constexpr uint8_t FAN_MINIMUM_DUTY_CYCLE = 6;  // The lowest PWM Duty Cycle the fank can look
+constexpr uint8_t FAN_MINIMUM_DUTY_CYCLE = 7;  // The lowest PWM Duty Cycle the fank can look
                                                // in datasheet for your fan
 constexpr uint8_t FAN_MAXIMAL_DUTY_CYCLE = 50; // Maximal Fan Speed
-constexpr uint8_t CIRCULATION_SPREAD = 5;     // Circulation spread between pwm groups top fan bottom fan
+constexpr uint8_t CIRCULATION_SPREAD = 5;      // Circulation spread between pwm groups top fan bottom fan
 bool fanOn = false;
 
 // INT CONF
 unsigned long previousMillis = 0;
 unsigned long temp_interval = 30000; // 30 second temp_interval for checkup relay off?
 unsigned long dry_interval = 180000; // 3 Minutes 180000ms
-
-// debug function uncomment for debug
-bool checkup = false;
-// #define DEBUG_PWM true
-#ifdef DEBUG_PWM
-long i = 0;
-long timer_cycles = 0;
-long Frequency = 0;
-
-bool pwmSignalDebug(const long i)
-{
-    // arduino nano 16MHz
-    Serial.println("PWM Signal Debug Output Nr: " + String(i));
-    Serial.println("#############################");
-
-    // show pin
-    Serial.print("PWM Connected to pin: ");
-    Serial.print(FAN_PWM_PIN_TOP_FAN.pwmPin);
-    Serial.print(" and ");
-    Serial.println(FAN_PWM_PIN_BOTTOM_FAN.pwmPin);
-    Serial.println("----------------------");
-
-    // test calculation of duty cycle
-    OCR1A = map(100, 0, 100, 0, ICR1);
-
-    // top
-    Serial.print("ICR1: ");
-    Serial.println(ICR1);
-    Serial.println("----------------------");
-    // duty cycle
-    Serial.print("OCR1A: ");
-    Serial.println(OCR1A);
-    Serial.println("----------------------");
-
-    // register timer1
-    Serial.print("Timer1 TCNT1: ");
-    Serial.print(TCNT1);
-    Serial.println(" Count before overflow");
-    Serial.println("----------------------");
-    // register
-    Serial.print("TCCR1A: ");
-    Serial.println(TCCR1A);
-    Serial.println("----------------------");
-    // register
-    Serial.print("TCCR1B: ");
-    Serial.println(TCCR1B);
-    Serial.println("----------------------");
-    // register
-    Serial.print("Register Setting COM1A0: ");
-    Serial.println(COM1A0);
-    Serial.println("----------------------");
-
-    // show frequency
-    Serial.print("PWM Signal Frequency: ");
-    timer_cycles = ICR1 + 1;
-    Frequency = 16000000 / (1 * timer_cycles) / 2;
-    Serial.print(Frequency);
-    Serial.println(" Hz");
-    Serial.println("----------------------");
-
-    delay(5000);
-    return true;
-}
-#endif
 
 void setup()
 {
@@ -173,16 +109,14 @@ void setup()
     delay(15);*/
 
     // init wire chanel check SHT45 connected
-#ifndef DEBUG_PWM
     Wire.begin();
     while (!sensor.begin())
     {
         Serial.println("SHT45 notfound!");
         // add error to display
-        lcd.print("SHT45 notfound!");
+        lcd.print("SHT45 not found!");
         delay(2000);
     }
-#endif
 }
 
 // overwrite default analogWrite function for pwm fan pins
@@ -200,41 +134,38 @@ void analogWrite(const Pin &pin, const uint8_t percent)
 
 void circulation(const uint8_t percent)
 {
-    if (percent <= FAN_MINIMUM_DUTY_CYCLE)
-    { // stop fan
-        analogWrite(FAN_PWM_PIN_TOP_FAN, 0);
-        analogWrite(FAN_PWM_PIN_BOTTOM_FAN, 0);
-        Serial.println("Stop fan circulation.");
-        return;
-    }
 
     if (percent - CIRCULATION_SPREAD <= FAN_MINIMUM_DUTY_CYCLE)
-    { // minimum circulation
+    {
+        // minimum circulation
         analogWrite(FAN_PWM_PIN_TOP_FAN, FAN_MINIMUM_DUTY_CYCLE);
-        analogWrite(FAN_PWM_PIN_BOTTOM_FAN, FAN_MINIMUM_DUTY_CYCLE);
-        Serial.println("Fan circulation spread value to big: Fan run default speed.");
-        return;
+        analogWrite(FAN_PWM_PIN_BOTTOM_FAN, percent);
+    }
+    else
+    {
+        // calculated circulation
+        analogWrite(FAN_PWM_PIN_TOP_FAN, percent - CIRCULATION_SPREAD);
+        analogWrite(FAN_PWM_PIN_BOTTOM_FAN, percent);
     }
 
-    // calculated circulation
-    analogWrite(FAN_PWM_PIN_TOP_FAN, percent - CIRCULATION_SPREAD);
-    analogWrite(FAN_PWM_PIN_BOTTOM_FAN, percent);
-
+    // print
     Serial.print("Fan run ");
     Serial.print(percent);
     Serial.println("%");
+    delay(1000);
 }
 
-// calculate the percent speed for todo validate types and resolution
+// calculate the speed
 uint8_t mySpeed(const float humi)
 {
 
     if (humi <= MIN_HUMIDITY)
     {
+        fanOn = true;
         return FAN_MINIMUM_DUTY_CYCLE;
     }
 
-    constexpr float h_range = 100 - MIN_HUMIDITY;                   // 46
+    constexpr float h_range = 100 - MIN_HUMIDITY;                            // 46
     constexpr int s_range = FAN_MAXIMAL_DUTY_CYCLE - FAN_MINIMUM_DUTY_CYCLE; // 44
 
     constexpr float part = s_range / h_range;
@@ -245,144 +176,88 @@ uint8_t mySpeed(const float humi)
     return speed; // 12
 }
 
-// system boot test
-bool startUpCheck()
-{
-    // display message
-    lcd.setCursor(0, 0);
-    lcd.print("Startup Check");
-    analogWrite(FAN_PWM_PIN_TOP_FAN, 100);
-    analogWrite(FAN_PWM_PIN_BOTTOM_FAN, 10);
-    Serial.println("Fan run 100% and 10%");
-    delay(20000);
-    analogWrite(FAN_PWM_PIN_TOP_FAN, 10);
-    analogWrite(FAN_PWM_PIN_BOTTOM_FAN, 100);
-    Serial.println("Fan run 10% and 100%");
-    delay(20000);
-    analogWrite(FAN_PWM_PIN_TOP_FAN, 50);
-    analogWrite(FAN_PWM_PIN_BOTTOM_FAN, 50);
-    Serial.println("Fan run 50%");
-    delay(10000);
-    analogWrite(FAN_PWM_PIN_TOP_FAN, 30);
-    analogWrite(FAN_PWM_PIN_BOTTOM_FAN, 30);
-    Serial.println("Fan run 30%");
-    delay(10000);
-    analogWrite(FAN_PWM_PIN_TOP_FAN, 5);
-    analogWrite(FAN_PWM_PIN_BOTTOM_FAN, 5);
-    Serial.println("Fan run 5%");
-    delay(10000);
-    analogWrite(FAN_PWM_PIN_TOP_FAN, 100);
-    analogWrite(FAN_PWM_PIN_BOTTOM_FAN, 100);
-    Serial.println("Fast run 100%");
-    delay(10000);
-    lcd.clear();
-    return true;
-}
-
 void loop()
 {
-#ifdef DEBUG_PWM
-    i++;
-    pwmSignalDebug(i);
+    // time marker
+    const unsigned long currentMillis = millis();
 
-    // Boot up fan check
-    if (checkup == false)
-    {
-        checkup = startUpCheck();
-    }
-#endif
-
-#ifndef DEBUG_PWM
-    // if the sensor connected
     if (sensor.measure())
     {
-        // serial debug message
+        const float temperature = sensor.temperature();
+        const float humidity = sensor.humidity();
+        const long speed = mySpeed(humidity);
+
+        // serial output
         Serial.print("Temperature: ");
-        Serial.print(sensor.temperature(), 1);
+        Serial.print(temperature, 1);
         Serial.print(" *C\tHumidity: ");
-        Serial.print(sensor.humidity(), 1);
+        Serial.print(humidity, 1);
         Serial.print(" %RH");
         Serial.println();
 
-        // time marker
-        const unsigned long currentMillis = millis();
-        const float temperature = sensor.temperature();
-        const float humidity = sensor.humidity();
-
-        // HANDLE TEMPERATURE
-        //  is HIGH
+        // TEMPERATURE IS HIGH COMPRESSOR RELAY ON
         if (temperature >= MAX_TEMPERATURE)
         {
+            // start compressor
             digitalWrite(COOLING_COMPRESSOR_PIN, HIGH);
-        }
-
-        if (currentMillis - previousMillis >= temp_interval)
-        {
+            Serial.println("Kühlung ON: ");
+            lcd.setCursor(0, 0);
+            lcd.print("Kuehlung ON");
+            lcd.setCursor(0, 1);
+            lcd.print(String("Temperatur: ") + String(temperature));
+            delay(3000);
             lcd.clear();
-
-            if (temperature >= MAX_TEMPERATURE)
+            // Fan circulation on
+            if (!fanOn)
             {
-                // start compressor
-                digitalWrite(COOLING_COMPRESSOR_PIN, HIGH);
-                // display message
-                lcd.setCursor(0, 0);
-                lcd.print("Kuehlung ON");
-                lcd.setCursor(0, 1);
-                lcd.print(String("Temperatur: ") + String(temperature));
-                delay(1000);
-                lcd.clear();
-                // Fan circulation on
-                if (!fanOn)
-                {
-                    fanOn = true;
-                    circulation(FAN_MINIMUM_DUTY_CYCLE);
-                }
-            }
-            else
-            {
-                // stop compressor
-                digitalWrite(COOLING_COMPRESSOR_PIN, LOW);
-                // display message
-                lcd.setCursor(0, 0);
-                lcd.print("Kuehlung OFF");
-                lcd.setCursor(0, 1);
-                lcd.print(String("Temperatur: ") + String(temperature));
-                delay(1000);
-                lcd.clear();
+                fanOn = true;
+                circulation(speed);
             }
         }
 
-        // set new time
+        // TEMPERATUR IS COOLING DOWN
+        if (temperature <= MIN_TEMPERATURE)
+        {
+            // show important massage
+            Serial.println("Kühlung ON: ");
+            lcd.setCursor(0, 0);
+            lcd.print("Kuehlung ON");
+            lcd.setCursor(0, 1);
+            lcd.print(String("Temperatur: ") + String(temperature));
+            delay(3000);
+            lcd.clear();
+            // Fan circulation on
+            if (!fanOn)
+            {
+                fanOn = true;
+                circulation(speed);
+            }
+        }
+
+        // TEMPERATURE IS LOW COMPRESSOR RELAY OFF
+        if (temperature <= MIN_TEMPERATURE)
+        {
+            // stop compressor
+            digitalWrite(COOLING_COMPRESSOR_PIN, LOW);
+            Serial.println("Kühlung OFF: ");
+            lcd.setCursor(0, 0);
+            lcd.print("Kuehlung OFF");
+            lcd.setCursor(0, 1);
+            lcd.print(String("Temperatur: ") + String(temperature));
+            delay(3000);
+            lcd.clear();
+        }
+
+        circulation(speed); // this funktion write to serial
+        lcd.setCursor(0, 0);
+        lcd.print(String("Humidity: ") + String(humidity));
+        lcd.setCursor(0, 1);
+        lcd.print("Fan Speed:" + String(speed));
+        delay(3000);
+        lcd.clear();
+
+        // set the time
         previousMillis = currentMillis;
-
-        // it is wet
-        if (humidity >= MIN_HUMIDITY)
-        {
-            fanOn = true;
-            const long speed = mySpeed(humidity);
-            circulation(speed);
-            lcd.setCursor(0, 0);
-            lcd.print(String("Humidity: ") + String(humidity));
-            lcd.setCursor(0, 1);
-            lcd.print("Fan Speed:" + String(speed));
-            delay(5000);
-            lcd.clear();
-        }
-
-        // it is too dry interval circulation
-        if (humidity < MIN_HUMIDITY and currentMillis - previousMillis >= dry_interval)
-        {
-            circulation(FAN_MINIMUM_DUTY_CYCLE);
-            lcd.setCursor(0, 0);
-            lcd.print(String("Humidity: ") + String(humidity));
-            lcd.setCursor(0, 1);
-            lcd.print("Fan Speed:" + String(FAN_MINIMUM_DUTY_CYCLE));
-            delay(30000); // 30sec
-            lcd.clear();
-            fanOn = false;
-            analogWrite(FAN_PWM_PIN_TOP_FAN, 0);
-            analogWrite(FAN_PWM_PIN_BOTTOM_FAN, 0);
-        }
     }
     else
     {
@@ -395,5 +270,4 @@ void loop()
         lcd.print("SHT45 sensor read error");
         delay(5000);
     }
-#endif
 }
